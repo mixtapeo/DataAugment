@@ -1,0 +1,25 @@
+SCVD: https://www.kaggle.com/datasets/toluwaniaremu/smartcity-cctv-violence-detection-dataset-scvd
+
+If you use this dataset, cite our paper:
+@InProceedings{
+10.1007/978-3-031-62269-4_2,
+author="Aremu, Toluwani
+and Zhiyuan, Li
+and Alameeri, Reem
+and Khan, Mustaqeem
+and Saddik, Abdulmotaleb El",
+editor="Arai, Kohei",
+title="SSIVD-Net: A Novel Salient Super Image Classification and Detection Technique for Weaponized Violence",
+booktitle="Intelligent Computing",
+year="2024",
+publisher="Springer Nature Switzerland",
+address="Cham",
+pages="16--35",
+isbn="978-3-031-62269-4"
+}
+
+2:
+    A. B. Chan and N. Vasconcelos, "Probabilistic Kernels for the Classification
+    of Auto-Regressive Visual Processes".  Proceedings of IEEE Conference on 
+    Computer Vision and Pattern Recognition, San Diego, 2005. 
+https://www.kaggle.com/datasets/aryashah2k/highway-traffic-videos-dataset
