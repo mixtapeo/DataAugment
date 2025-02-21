@@ -241,7 +241,7 @@ public class VideoProcessorGUI extends JFrame {
         
         return new String[] {
             "python",
-            "your_script.py",
+            "main.py",
             folderMode ? "--folder" : "--input",
             inputPathField.getText(),
             outputPathField.getText(),
