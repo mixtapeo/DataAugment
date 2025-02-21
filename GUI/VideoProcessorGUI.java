@@ -1,8 +1,10 @@
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
 import javax.swing.*;
 
 public class VideoProcessorGUI extends JFrame {
@@ -10,12 +12,17 @@ public class VideoProcessorGUI extends JFrame {
     private JButton processButton;
     private JTextField inputPathField;
     private JTextField outputPathField;
+    private JCheckBox stepMode; // Does nothing, but should allow user to add steps to each parameter, and one file will have each parameter applied step amount till end.
     private JCheckBox folderProcessingCheck;
+    private JCheckBox cutoutOn;
+    private JCheckBox cutoutImageCheck;
+    private JTextField cutoutImageField;
     private JSpinner angleSpinner;
     private JSpinner brightnessSpinner;
     private JComboBox<String> flipCombo;
     private JSpinner noiseSpinner;
     private JSpinner[] colorShiftSpinners;
+    private boolean cutoutCheckCondition = false;
 
     public VideoProcessorGUI() {
         initializeUI();
@@ -39,7 +46,11 @@ public class VideoProcessorGUI extends JFrame {
         folderProcessingCheck = new JCheckBox("Process Folder");
         folderProcessingCheck.addActionListener(e -> updatePathFields());
         addComponent(mainPanel, gbc, new JLabel("Processing Mode:"), 0, row);
-        addComponent(mainPanel, gbc, folderProcessingCheck, 1, row++);
+        addComponent(mainPanel, gbc, folderProcessingCheck, 1, row);
+
+        stepMode = new JCheckBox("Step Mode"); 
+        stepMode.addActionListener(e -> updatePathFields());
+        addComponent(mainPanel, gbc, stepMode, 2, row++);
 
         // Input Path
         addComponent(mainPanel, gbc, new JLabel("Input Path:"), 0, row);
@@ -56,7 +67,15 @@ public class VideoProcessorGUI extends JFrame {
         addComponent(mainPanel, gbc, createPathPanel(outputPathField, outputBrowse), 1, row++);
 
         // Transformation Parameters
-        addComponent(mainPanel, gbc, createSeparator("Transformations"), 0, row++, 2);
+        addComponent(mainPanel, gbc, createSeparator("Transformations:"), 0, row++, 2);
+
+        // Cutout / CutMix
+        addComponent(mainPanel, gbc, new JLabel("Cutout / CutMix"), 0, row);
+        addComponent(mainPanel, gbc, cutoutOn = new JCheckBox("On"), 1, row);
+        addComponent(mainPanel, gbc, cutoutImageCheck = new JCheckBox("Image Path"), 2, row);
+        JButton cutoutBrowse = new JButton("Browse");
+        cutoutBrowse.addActionListener(e -> cutoutImagePath());
+        addComponent(mainPanel, gbc, createPathPanel(cutoutImageField = new JTextField(30), cutoutBrowse), 3, row++);
 
         // Rotation Angle
         angleSpinner = new JSpinner(new SpinnerNumberModel(45.0, -360.0, 360.0, 1.0));
@@ -140,35 +159,60 @@ public class VideoProcessorGUI extends JFrame {
         return panel;
     }
 
+    private String browsePath(boolean isInput, boolean isFolder, String defaultFileName) {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setCurrentDirectory(new File(System.getProperty("user.dir")));
+        
+        if (isFolder) {
+            chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+        } else {
+            if (isInput) {
+                chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("AVI Files", "avi"));
+            } else {
+                chooser.setSelectedFile(new File(defaultFileName));
+            }
+        }
+        
+        int result = isInput ? chooser.showOpenDialog(this) : chooser.showSaveDialog(this);
+        
+        if (result == JFileChooser.APPROVE_OPTION) {
+            return chooser.getSelectedFile().getAbsolutePath();
+        }
+        return "";
+    }
+
     private void updatePathFields() {
-        boolean folderMode = folderProcessingCheck.isSelected();
-        inputPathField.setText("");
-        outputPathField.setText(folderMode ? "" : "output.avi");
+    // Set default to current directory
+    String currentDir = System.getProperty("user.dir");
+    boolean folderMode = folderProcessingCheck.isSelected();
+    inputPathField.setText(currentDir);
+    // For file mode, default output file name is output.avi in current directory
+    outputPathField.setText(folderMode ? currentDir : currentDir + File.separator + "output.avi");
     }
 
     private void browseInputPath() {
-        JFileChooser chooser = new JFileChooser();
-        if (folderProcessingCheck.isSelected()) {
-            chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-        } else {
-            chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("AVI Files", "avi"));
+        boolean folderMode = folderProcessingCheck.isSelected();
+        String path = browsePath(true, folderMode, null);
+        if (!path.isEmpty()) {
+            inputPathField.setText(path);
         }
-        
-        if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
-            inputPathField.setText(chooser.getSelectedFile().getAbsolutePath());
+    }
+    
+    private void browseOutputPath() {
+        boolean folderMode = folderProcessingCheck.isSelected();
+        String defaultFile = "output.avi";
+        String path = browsePath(false, folderMode, defaultFile);
+        if (!path.isEmpty()) {
+            outputPathField.setText(path);
         }
     }
 
-    private void browseOutputPath() {
+    private void cutoutImagePath(){
         JFileChooser chooser = new JFileChooser();
-        if (folderProcessingCheck.isSelected()) {
-            chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-        } else {
-            chooser.setSelectedFile(new java.io.File("output.avi"));
-        }
-        
-        if (chooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
-            outputPathField.setText(chooser.getSelectedFile().getAbsolutePath());
+        boolean on = cutoutOn.isSelected();
+        boolean cutmix = cutoutImageCheck.isSelected();
+        if (cutmix){
+
         }
     }
 
@@ -236,25 +280,34 @@ public class VideoProcessorGUI extends JFrame {
     }
 
     private String[] buildCommand() {
-        boolean folderMode = folderProcessingCheck.isSelected();
-        String flipCode = getFlipCode();
-        
-        return new String[] {
-            "python",
-            "main.py",
-            folderMode ? "--folder" : "--input",
-            inputPathField.getText(),
-            outputPathField.getText(),
-            "--angle", String.valueOf(angleSpinner.getValue()),
-            "--brightness", String.valueOf(brightnessSpinner.getValue()),
-            flipCode != null ? "--flip" : "",
-            flipCode != null ? flipCode : "",
-            "--gaussian", String.valueOf(noiseSpinner.getValue()),
-            "--color_shift",
-            String.valueOf(colorShiftSpinners[0].getValue()),
-            String.valueOf(colorShiftSpinners[1].getValue()),
-            String.valueOf(colorShiftSpinners[2].getValue())
-        };
+    boolean folderMode = folderProcessingCheck.isSelected();
+    ArrayList<String> command = new ArrayList<>();
+    
+    command.add("python");
+    command.add("main.py");
+    command.add(folderMode ? "--inputfolder" : "--input");
+    command.add(inputPathField.getText());
+    command.add("--output");
+    command.add(outputPathField.getText());
+    command.add("--angle");
+    command.add(String.valueOf(angleSpinner.getValue()));
+    command.add("--brightness");
+    command.add(String.valueOf(brightnessSpinner.getValue()));
+    
+    String flipCode = getFlipCode();
+    if (flipCode != null) {
+        command.add("--flip");
+        command.add(flipCode);
+    }
+    
+    command.add("--gaussian");
+    command.add(String.valueOf(noiseSpinner.getValue()));
+    command.add("--color_shift");
+    command.add(String.valueOf(colorShiftSpinners[0].getValue()));
+    command.add(String.valueOf(colorShiftSpinners[1].getValue()));
+    command.add(String.valueOf(colorShiftSpinners[2].getValue()));
+    
+    return command.toArray(new String[0]);
     }
 
     private String getFlipCode() {

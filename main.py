@@ -47,27 +47,34 @@ def process_video(input_path, output_path, angle, brightness, flip, gaussian, co
         print(f"Error opening video file: {input_path}")
         return
 
-    # Create output directory if it doesn't exist
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
-    # Get video properties
     fps = cap.get(cv2.CAP_PROP_FPS)
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-    # Initialize VideoWriter
-    fourcc = cv2.VideoWriter_fourcc(*'XVID')
-    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    # Read the first frame to determine output dimensions after transformation.
+    ret, first_frame = cap.read()
+    if not ret:
+        print("Error reading the first frame.")
+        return
 
-    # Process frames
+    # Transform the first frame to get proper dimensions.
+    transformed_first = rotate_frame(first_frame, angle)
+    # (Optionally, apply brightness/flip/noise/color_shift here if they change size.)
+    out_width = transformed_first.shape[1]
+    out_height = transformed_first.shape[0]
+
+    # Create the VideoWriter with the new dimensions.
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    out = cv2.VideoWriter(output_path, fourcc, fps, (out_width, out_height))
+    
+    # Reset the capture back to the start.
+    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+    
     current_frame = 0
     while True:
         ret, frame = cap.read()
         if not ret:
             break
 
-        # Apply transformations
         transformed = rotate_frame(frame, angle)
         if brightness != 1.0:
             transformed = adjust_brightness(transformed, brightness)
@@ -78,24 +85,25 @@ def process_video(input_path, output_path, angle, brightness, flip, gaussian, co
         if any(color_shift):
             transformed = color_shift_frame(transformed, *color_shift)
 
-        # Write frame
+        # Ensure transformed frame matches the chosen output size.
+        if (transformed.shape[1], transformed.shape[0]) != (out_width, out_height):
+            transformed = cv2.resize(transformed, (out_width, out_height))
+            
         out.write(transformed)
-
-        # Progress reporting
+        
         current_frame += 1
         if current_frame % 10 == 0:
             print(f"Processing: {current_frame/total_frames:.1%}")
 
-    # Release resources
     cap.release()
     out.release()
     print(f"Transformed video saved to: {output_path}")
 
 # Folder processing with multiprocessing
 def process_videos_in_folder(input_folder, output_folder, angle, brightness, flip, gaussian, color_shift):
-    avi_files = glob.glob(os.path.join(input_folder, "**", "*.avi"), recursive=True)
+    avi_files = glob.glob(os.path.join(input_folder, "**", "*.avi"), recursive=True) #list of all avi files
     avi_files += glob.glob(os.path.join(input_folder, "**", "*.AVI"), recursive=True)
-
+    print(avi_files)
     if not avi_files:
         print(f"No AVI files found in {input_folder}")
         return
@@ -118,9 +126,9 @@ def process_videos_in_folder(input_folder, output_folder, angle, brightness, fli
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Apply geometric and visual transformations to .avi video files.")
     parser.add_argument("--input", help="Path to input .avi file")
-    parser.add_argument("--folder", help="Path to input folder containing .avi files")
-    parser.add_argument("output", help="Path to output .avi file or output folder when processing a folder")
-    parser.add_argument("--angle", type=float, default=45, help="Rotation angle in degrees (default: 45)")
+    parser.add_argument("--inputfolder", help="Path to input folder containing .avi files")
+    parser.add_argument("--output", help="Name or path for the output .avi file or output folder when processing a folder")
+    parser.add_argument("--angle", type=float, default=0, help="Rotation angle in degrees (default: 45)")
     parser.add_argument("--brightness", type=float, default=1.0, help="Brightness factor (default: 1.0, no change)")
     parser.add_argument("--flip", type=int, choices=[-1, 0, 1], help="Flip code: 1 (horizontal), 0 (vertical), -1 (both). If not provided, no flip is applied")
     parser.add_argument("--gaussian", type=float, default=0.0, help="Standard deviation for Gaussian noise (default: 0, no noise)")
@@ -130,15 +138,21 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Validate inputs
-    if not args.folder and not args.input:
-        print("Error: You must provide --input for a single file or --folder for a folder of AVI files.")
+    if not args.inputfolder and not args.input:
+        print("Error: You must provide --input for a single file or --inputfolder for a folder of AVI files.")
         exit(1)
+    
+    # If output argument is just a filename, join it with the current working directory.
+    output_path = args.output
+    if output_path and not os.path.dirname(output_path):
+        output_path = os.path.join(os.getcwd(), output_path)
 
-    # Process videos
+    # Process videos in either file mode or folder mode
     start_time = time.time()
-    if args.folder:
-        process_videos_in_folder(args.folder, args.output, args.angle, args.brightness, args.flip, args.gaussian, args.color_shift)
+    if args.inputfolder:
+        # For folder processing, if output_path is a filename, treat it as a folder name.
+        process_videos_in_folder(args.inputfolder, output_path, args.angle, args.brightness, args.flip, args.gaussian, args.color_shift)
     else:
-        process_video(args.input, args.output, args.angle, args.brightness, args.flip, args.gaussian, args.color_shift)
+        process_video(args.input, output_path, args.angle, args.brightness, args.flip, args.gaussian, args.color_shift)
     
     print(f"Total processing time: {time.time() - start_time:.2f} seconds")
