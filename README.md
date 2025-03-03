@@ -40,7 +40,8 @@ Folder:
 
 ## Future TODOs
 1. Implement Cutout and CutMix.
-2. In total 6C1 + 6C2 + 6C3... = 63 augmentations on one frame. Thus 63 videos from 1 video. Try doing an augmentation on each frame, so 63 * 60 FPS videos.
+2. CUDA version (i think only have to update cv2 dependency to cv2-cuda).
+3. In total 6C1 + 6C2 + 6C3... = 63 augmentations on one frame. Thus 63 videos from 1 video. Try doing an augmentation on each frame, so 63 * 60 FPS videos.
    1. Investigate which augemenations are useful and which arent that impactful.
    2. Add GUI and steps (Automating augmentation).
-3. Possibly GAN (model based) augmentations.
+4. Possibly GAN (model based) augmentations.
